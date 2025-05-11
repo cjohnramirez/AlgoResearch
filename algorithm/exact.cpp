@@ -7,8 +7,9 @@
 #include <ctime>
 #include <thread>
 #include <chrono>
+#include <limits> // Required for std::numeric_limits
 
-const int INF_EXACT = 1e9;
+const long long INF_EXACT = std::numeric_limits<long long>::max(); // Use long long for INF
 
 struct EdgeExact
 {
@@ -17,19 +18,13 @@ struct EdgeExact
     int id;
     bool is_blocked;
 
+    // Sort primarily by weight, then id for tie-breaking
     bool operator<(const EdgeExact &other) const
     {
-
-        if (is_blocked != other.is_blocked)
-        {
-            return !is_blocked;
-        }
-
         if (weight != other.weight)
         {
             return weight < other.weight;
         }
-
         return id < other.id;
     }
 
@@ -73,13 +68,20 @@ struct DSUExact
     }
 };
 
-std::pair<int, std::vector<EdgeExact>> kruskal_exact(
+std::pair<long long, std::vector<EdgeExact>> kruskal_exact(
     std::vector<EdgeExact> edges,
-    const std::vector<int> &active_vertices)
+    const std::vector<int> &active_vertices,
+    const std::set<int>& active_vertices_set) // Pass set for efficient lookup
 {
+    // If no active vertices, cost is 0, no edges
     if (active_vertices.empty())
     {
         return {0, {}};
+    }
+
+    // If only one active vertex, cost is 0, no edges needed
+    if (active_vertices.size() == 1) {
+         return {0, {}};
     }
 
     std::sort(edges.begin(), edges.end());
@@ -91,15 +93,16 @@ std::pair<int, std::vector<EdgeExact>> kruskal_exact(
         vertex_to_dsu_idx[v_orig] = dsu_idx_counter++;
     }
 
+    // DSU size should be based on the number of active vertices
     DSUExact dsu(dsu_idx_counter);
-    int mst_cost = 0;
+    long long mst_cost = 0; // Use long long for cost
     std::vector<EdgeExact> mst_edges;
 
     for (const auto &edge : edges)
     {
-
-        if (vertex_to_dsu_idx.find(edge.u) == vertex_to_dsu_idx.end() ||
-            vertex_to_dsu_idx.find(edge.v) == vertex_to_dsu_idx.end())
+        // Only consider edges between active vertices
+        if (active_vertices_set.find(edge.u) == active_vertices_set.end() ||
+            active_vertices_set.find(edge.v) == active_vertices_set.end())
         {
             continue;
         }
@@ -112,57 +115,94 @@ std::pair<int, std::vector<EdgeExact>> kruskal_exact(
             dsu.unite(u_dsu, v_dsu);
             mst_cost += edge.weight;
             mst_edges.push_back(edge);
+            // Optimization: if we have connected all active vertices (num_components == 1)
+            if (dsu.num_components == 1) break;
         }
     }
 
-    return {mst_cost, mst_edges};
+    // Check if all active vertices are connected
+    // The MST must connect all vertices in active_vertices for a valid Steiner tree candidate
+    bool all_active_connected = (dsu.num_components <= 1); // Should be exactly 1 if connected
+
+    if (all_active_connected) {
+         return {mst_cost, mst_edges};
+    } else {
+        // If not all active vertices are connected, this subset is not valid for Steiner tree
+        return {INF_EXACT, {}};
+    }
 }
 
-void f()
-{
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-}
 
 int main()
 {
-    auto t1 = std::chrono::high_resolution_clock::now();
-    f();
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(NULL);
 
-    int num_vertices, num_edges_input;
-    std::cout << "Enter number of vertices and number of edges: ";
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    int num_vertices;
+    int num_edges_input;
     std::cin >> num_vertices >> num_edges_input;
 
+    if (num_vertices <= 0 || num_edges_input < 0)
+    {
+        std::cerr << "Invalid number of vertices or edges." << std::endl;
+        return 1;
+    }
+
     std::vector<EdgeExact> all_edges_original;
-    std::cout << "Enter edges (u v weight is_blocked(0 or 1)):" << std::endl;
+    all_edges_original.reserve(num_edges_input);
     for (int i = 0; i < num_edges_input; ++i)
     {
         int u, v, w, blocked_flag;
         std::cin >> u >> v >> w >> blocked_flag;
+
+        if (u < 0 || u >= num_vertices || v < 0 || v >= num_vertices)
+        {
+             continue;
+        }
+
+        if (u == v)
+        {
+            continue;
+        }
+
         all_edges_original.push_back({u, v, w, i, (blocked_flag == 1)});
     }
 
-    int num_terminals;
-    std::cout << "Enter number of terminals: ";
-    std::cin >> num_terminals;
-    std::vector<int> terminals(num_terminals);
+    int num_terminals_input;
+    std::cin >> num_terminals_input;
+    std::vector<int> terminals_input(num_terminals_input);
     std::set<int> terminal_set;
-    std::cout << "Enter terminal vertices:" << std::endl;
-    for (int i = 0; i < num_terminals; ++i)
+    for (int i = 0; i < num_terminals_input; ++i)
     {
-        std::cin >> terminals[i];
-        terminal_set.insert(terminals[i]);
+        std::cin >> terminals_input[i];
+        if (terminals_input[i] < 0 || terminals_input[i] >= num_vertices) {
+             continue;
+        }
+        terminal_set.insert(terminals_input[i]);
     }
 
+    std::vector<int> terminals(terminal_set.begin(), terminal_set.end());
+    int num_terminals = terminals.size();
+
+
+    // Base case: 0 or 1 terminal
     if (num_terminals <= 1)
     {
-        std::cout << "\n--- Exact Algorithm Result ---" << std::endl;
+        std::cout << "--- Exact Algorithm Result (Brute-Force Subset Enumeration) ---" << std::endl;
         std::cout << "Total Cost: 0" << std::endl;
-        std::cout << "Edges in Steiner Tree:" << std::endl;
+        std::cout << "Edges in Steiner Tree (0 edges):" << std::endl;
 
+        auto t2 = std::chrono::high_resolution_clock::now();
+        std::cout << "Exact took "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+                  << " milliseconds\n";
         return 0;
     }
 
     std::vector<int> non_terminals;
+    non_terminals.reserve(num_vertices - num_terminals);
     for (int i = 0; i < num_vertices; ++i)
     {
         if (terminal_set.find(i) == terminal_set.end())
@@ -171,112 +211,54 @@ int main()
         }
     }
 
-    int min_steiner_tree_cost = INF_EXACT;
+    long long min_steiner_tree_cost = INF_EXACT;
     std::vector<EdgeExact> best_steiner_tree_edges;
 
     int num_non_terminals = non_terminals.size();
 
+    // Brute force over all subsets of non-terminals
     for (int i = 0; i < (1 << num_non_terminals); ++i)
     {
         std::vector<int> current_active_nodes = terminals;
-        std::vector<EdgeExact> current_graph_edges;
+        std::set<int> active_nodes_set(terminals.begin(), terminals.end());
 
+        // Add selected non-terminals to active nodes
         for (int j = 0; j < num_non_terminals; ++j)
         {
             if ((i >> j) & 1)
             {
                 current_active_nodes.push_back(non_terminals[j]);
+                active_nodes_set.insert(non_terminals[j]);
             }
         }
 
-        std::set<int> active_nodes_set(current_active_nodes.begin(), current_active_nodes.end());
+        std::vector<EdgeExact> current_graph_edges;
+        current_graph_edges.reserve(all_edges_original.size());
 
+        // Build the subgraph for the current set of active nodes, INCLUDE ONLY NON-BLOCKED EDGES
         for (const auto &original_edge : all_edges_original)
         {
-            if (active_nodes_set.count(original_edge.u) && active_nodes_set.count(original_edge.v))
+            if (!original_edge.is_blocked && active_nodes_set.count(original_edge.u) && active_nodes_set.count(original_edge.v))
             {
                 current_graph_edges.push_back(original_edge);
             }
         }
 
-        if (current_active_nodes.empty() && num_terminals > 0)
-            continue;
-        if (current_active_nodes.empty() && num_terminals == 0)
+        // If there are active nodes, find MST
+        if (!current_active_nodes.empty())
         {
-            if (0 < min_steiner_tree_cost)
+            std::pair<long long, std::vector<EdgeExact>> current_mst_result =
+                kruskal_exact(current_graph_edges, current_active_nodes, active_nodes_set);
+
+            // kruskal_exact returns INF_EXACT cost if active vertices are not connected
+            if (current_mst_result.first != INF_EXACT)
             {
-                min_steiner_tree_cost = 0;
-                best_steiner_tree_edges.clear();
-            }
-            continue;
-        }
+                // This MST connects all nodes in current_active_nodes.
+                // We need to ensure all ORIGINAL terminals are in current_active_nodes.
+                // This is guaranteed by the subset enumeration logic (terminals are always included).
+                // The kruskal_exact function now verifies if all nodes in active_vertices are connected.
+                // So, if current_mst_result.first != INF_EXACT, all terminals are connected in this subgraph.
 
-        std::pair<int, std::vector<EdgeExact>> current_mst_result =
-            kruskal_exact(current_graph_edges, current_active_nodes);
-
-        if (!current_mst_result.second.empty() || current_active_nodes.size() == 1)
-        {
-
-            std::map<int, int> node_to_dsu_idx;
-            int dsu_idx_count = 0;
-            for (int node : active_nodes_set)
-            {
-                node_to_dsu_idx[node] = dsu_idx_count++;
-            }
-
-            if (dsu_idx_count == 0 && num_terminals > 0)
-                continue;
-
-            DSUExact terminal_connectivity_dsu(dsu_idx_count > 0 ? dsu_idx_count : 1);
-
-            for (const auto &edge_in_mst : current_mst_result.second)
-            {
-
-                if (node_to_dsu_idx.count(edge_in_mst.u) && node_to_dsu_idx.count(edge_in_mst.v))
-                {
-                    terminal_connectivity_dsu.unite(
-                        node_to_dsu_idx[edge_in_mst.u],
-                        node_to_dsu_idx[edge_in_mst.v]);
-                }
-            }
-
-            bool all_terminals_connected_in_this_mst = true;
-            if (num_terminals > 0)
-            {
-
-                if (!node_to_dsu_idx.count(terminals[0]))
-                {
-                    all_terminals_connected_in_this_mst = false;
-                }
-
-                if (all_terminals_connected_in_this_mst)
-                {
-                    int first_terminal_root = node_to_dsu_idx.count(terminals[0]) ? terminal_connectivity_dsu.find(node_to_dsu_idx[terminals[0]]) : -1;
-                    if (first_terminal_root == -1 && num_terminals > 0)
-                    {
-                        all_terminals_connected_in_this_mst = false;
-                    }
-                    else
-                    {
-                        for (size_t k = 1; k < terminals.size(); ++k)
-                        {
-                            if (!node_to_dsu_idx.count(terminals[k]) ||
-                                terminal_connectivity_dsu.find(node_to_dsu_idx[terminals[k]]) != first_terminal_root)
-                            {
-                                all_terminals_connected_in_this_mst = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                all_terminals_connected_in_this_mst = true;
-            }
-
-            if (all_terminals_connected_in_this_mst)
-            {
                 if (current_mst_result.first < min_steiner_tree_cost)
                 {
                     min_steiner_tree_cost = current_mst_result.first;
@@ -284,32 +266,14 @@ int main()
                 }
             }
         }
-        else if (num_terminals == 0)
-        {
-            if (0 < min_steiner_tree_cost)
-            {
-                min_steiner_tree_cost = 0;
-                best_steiner_tree_edges.clear();
-            }
-        }
-        else if (num_terminals > 0 && active_nodes_set.size() == num_terminals)
-        {
-        }
     }
 
-    std::cout << "\n--- Exact Algorithm Result (Brute-Force Subset Enumeration) ---" << std::endl;
-    if (min_steiner_tree_cost == INF_EXACT)
+    std::cout << "--- Exact Algorithm Result (Brute-Force Subset Enumeration) ---" << std::endl;
+    if (min_steiner_tree_cost >= INF_EXACT)
     {
-        if (num_terminals > 0)
-        {
-            std::cout << "Could not connect all terminals." << std::endl;
-            std::cout << "Total Cost: INF" << std::endl;
-        }
-        else
-        {
-            std::cout << "Total Cost: 0" << std::endl;
-            std::cout << "Edges in Steiner Tree (0 edges):" << std::endl;
-        }
+        std::cout << "Could not connect all terminals using unblocked paths." << std::endl;
+        std::cout << "Total Cost: INF" << std::endl;
+        std::cout << "Edges in Steiner Tree (0 edges):" << std::endl;
     }
     else
     {
@@ -317,17 +281,8 @@ int main()
         std::cout << "Edges in Steiner Tree (" << best_steiner_tree_edges.size() << " edges):" << std::endl;
         for (const auto &edge : best_steiner_tree_edges)
         {
-            std::cout << edge.u << " " << edge.v << " " << edge.weight;
-
-            if (edge.is_blocked)
-            {
-                std::cout << " 0";
-            }
-            else
-            {
-                std::cout << " 1";
-            }
-            std::cout << std::endl;
+            // Output format consistent with input (0 for not blocked, 1 for blocked)
+            std::cout << edge.u << " " << edge.v << " " << edge.weight << " " << (edge.is_blocked ? 1 : 0) << std::endl;
         }
     }
 
