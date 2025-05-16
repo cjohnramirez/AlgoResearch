@@ -53,14 +53,14 @@ def parse_graph_file(file_path):
     return G, terminals, steiner_exact_edges, steiner_approx_edges
 
 def draw_graph(G, terminals, steiner_edges, title):
-    pos = nx.spring_layout(G, seed=42, k=0.1)  
+    pos = nx.spring_layout(G, seed=42, k=1)  
     plt.figure(figsize=(8, 6))
 
     # Draw all edges
     blocked_edges = [(u, v) for u, v in G.edges if G[u][v]['blocked']]
     normal_edges = [(u, v) for u, v in G.edges if not G[u][v]['blocked']]
 
-    nx.draw_networkx_edges(G, pos, edgelist=normal_edges, width=1, edge_color='gray', alpha=0)
+    nx.draw_networkx_edges(G, pos, edgelist=normal_edges, width=1, edge_color='gray', alpha=0.2)
     nx.draw_networkx_edges(G, pos, edgelist=blocked_edges, width=1, edge_color='red', style='dashed')
     nx.draw_networkx_edges(G, pos, edgelist=steiner_edges, width=1, edge_color='blue')
 
