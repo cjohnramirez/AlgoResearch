@@ -7,7 +7,7 @@
 // Optimized exact algorithm for Steiner Tree
 // This uses branch and bound technique with several pruning strategies
 
-SteinerTree exact_algorithm(const Graph& graph)
+SteinerTree exact_algorithm(const Graph &graph)
 {
     auto start_time = std::chrono::high_resolution_clock::now();
     SteinerTree result;
