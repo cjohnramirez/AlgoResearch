@@ -95,26 +95,33 @@ struct SteinerTree
 
     void print_results() const
     {
+
         std::cout << "Steiner Tree Results:" << std::endl;
         std::cout << "Edges in Steiner tree:" << std::endl;
+        // Save results to a file
+        std::ofstream outfile("results.txt");
+        if (!outfile.is_open())
+        {
+            // Try to create the file
+            outfile.open("results.txt", std::ios::out | std::ios::trunc);
+            if (!outfile.is_open())
+            {
+                std::cerr << "Error opening or creating output file!" << std::endl;
+                return;
+            }
+        }
         for (const Edge &edge : edges)
         {
-            std::cout << "  (" << edge.u << ", " << edge.v << ") - Weight: " << edge.weight
-                      << (edge.is_blocked ? " [BLOCKED]" : "") << std::endl;
+            std::cout << edge.u << " " << edge.v << " " << edge.weight
+                      << (edge.is_blocked ? " 1" : " 0") << std::endl;
+            outfile << edge.u << " " << edge.v << " " << edge.weight
+                    << (edge.is_blocked ? " 1" : " 0") << std::endl;
         }
-
+        outfile.close();
+        std::cout << "Number of unblocked edges: " << edges.size() << std::endl;
         std::cout << "Total weight of unblocked edges: " << total_weight << std::endl;
         std::cout << "Number of blocked edges: " << blocked_edges.size() << std::endl;
         std::cout << "Total weight of blocked edges: " << blockedWeight() << std::endl;
-
-        if (!blocked_edges.empty())
-        {
-            std::cout << "Blocked edges used:" << std::endl;
-            for (const Edge &edge : blocked_edges)
-            {
-                std::cout << "  (" << edge.u << ", " << edge.v << ") - Weight: " << edge.weight << std::endl;
-            }
-        }
 
         std::cout << "Runtime: " << runtime << " ms" << std::endl;
         std::cout << std::endl;
@@ -173,64 +180,79 @@ public:
     }
 
     // Compute shortest paths between all pairs of vertices
-    std::vector<std::vector<std::pair<int, std::vector<Edge>>>> shortestPaths() const {
-    std::vector<std::vector<std::pair<int, std::vector<Edge>>>> paths(V, std::vector<std::pair<int, std::vector<Edge>>>(V, {std::numeric_limits<int>::max(), {}}));
-    
-    // Initialize with direct edges
-    for (int u = 0; u < V; ++u) {
-        paths[u][u] = {0, {}}; // Distance to self is 0
-        for (const Edge& edge : adj[u]) {
-            int v = edge.v;
-            // We now use the actual edge weight in the calculation rather than a heavy penalty
-            paths[u][v] = {edge.weight, {edge}}; 
+    std::vector<std::vector<std::pair<int, std::vector<Edge>>>> shortestPaths() const
+    {
+        std::vector<std::vector<std::pair<int, std::vector<Edge>>>> paths(V, std::vector<std::pair<int, std::vector<Edge>>>(V, {std::numeric_limits<int>::max(), {}}));
+
+        // Initialize with direct edges
+        for (int u = 0; u < V; ++u)
+        {
+            paths[u][u] = {0, {}}; // Distance to self is 0
+            for (const Edge &edge : adj[u])
+            {
+                int v = edge.v;
+                // We now use the actual edge weight in the calculation rather than a heavy penalty
+                paths[u][v] = {edge.weight, {edge}};
+            }
         }
-    }
-    
-    // Modified Floyd-Warshall algorithm that prioritizes minimizing blocked edge weight
-    for (int k = 0; k < V; ++k) {
-        for (int i = 0; i < V; ++i) {
-            for (int j = 0; j < V; ++j) {
-                if (paths[i][k].first != std::numeric_limits<int>::max() && 
-                    paths[k][j].first != std::numeric_limits<int>::max()) {
-                    
-                    // Calculate blocked weight for current best path i->j
-                    int current_blocked_weight = 0;
-                    for (const Edge& e : paths[i][j].second) {
-                        if (e.is_blocked) current_blocked_weight += e.weight;
-                    }
-                    
-                    // Calculate blocked weight for potential new path i->k->j
-                    int new_blocked_weight = 0;
-                    for (const Edge& e : paths[i][k].second) {
-                        if (e.is_blocked) new_blocked_weight += e.weight;
-                    }
-                    for (const Edge& e : paths[k][j].second) {
-                        if (e.is_blocked) new_blocked_weight += e.weight;
-                    }
-                    
-                    // Replace if new path has lower blocked weight, or equal blocked weight but lower total weight
-                    bool replace = false;
-                    if (paths[i][j].second.empty() || 
-                        new_blocked_weight < current_blocked_weight || 
-                        (new_blocked_weight == current_blocked_weight && 
-                         paths[i][k].first + paths[k][j].first < paths[i][j].first)) {
-                        replace = true;
-                    }
-                    
-                    if (replace) {
-                        // Combine the paths
-                        std::vector<Edge> new_path = paths[i][k].second;
-                        new_path.insert(new_path.end(), paths[k][j].second.begin(), paths[k][j].second.end());
-                        
-                        paths[i][j] = {paths[i][k].first + paths[k][j].first, new_path};
+
+        // Modified Floyd-Warshall algorithm that prioritizes minimizing blocked edge weight
+        for (int k = 0; k < V; ++k)
+        {
+            for (int i = 0; i < V; ++i)
+            {
+                for (int j = 0; j < V; ++j)
+                {
+                    if (paths[i][k].first != std::numeric_limits<int>::max() &&
+                        paths[k][j].first != std::numeric_limits<int>::max())
+                    {
+
+                        // Calculate blocked weight for current best path i->j
+                        int current_blocked_weight = 0;
+                        for (const Edge &e : paths[i][j].second)
+                        {
+                            if (e.is_blocked)
+                                current_blocked_weight += e.weight;
+                        }
+
+                        // Calculate blocked weight for potential new path i->k->j
+                        int new_blocked_weight = 0;
+                        for (const Edge &e : paths[i][k].second)
+                        {
+                            if (e.is_blocked)
+                                new_blocked_weight += e.weight;
+                        }
+                        for (const Edge &e : paths[k][j].second)
+                        {
+                            if (e.is_blocked)
+                                new_blocked_weight += e.weight;
+                        }
+
+                        // Replace if new path has lower blocked weight, or equal blocked weight but lower total weight
+                        bool replace = false;
+                        if (paths[i][j].second.empty() ||
+                            new_blocked_weight < current_blocked_weight ||
+                            (new_blocked_weight == current_blocked_weight &&
+                             paths[i][k].first + paths[k][j].first < paths[i][j].first))
+                        {
+                            replace = true;
+                        }
+
+                        if (replace)
+                        {
+                            // Combine the paths
+                            std::vector<Edge> new_path = paths[i][k].second;
+                            new_path.insert(new_path.end(), paths[k][j].second.begin(), paths[k][j].second.end());
+
+                            paths[i][j] = {paths[i][k].first + paths[k][j].first, new_path};
+                        }
                     }
                 }
             }
         }
+
+        return paths;
     }
-    
-    return paths;
-}
 
     // Dijkstra's algorithm for shortest path with preference for non-blocked edges
     std::vector<Edge> shortestPath(int start, int end) const
