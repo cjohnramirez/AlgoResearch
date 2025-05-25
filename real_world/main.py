@@ -120,10 +120,12 @@ def visualize_solution(
                 location=(data["y"], data["x"]),
                 radius=radius,
                 color="black",
+                weight=1,
                 fill=True,
                 fill_color=color,
                 fill_opacity=0.7,
                 tooltip=f"Node ID: {node}",
+                set_style={},
             ).add_to(m)
 
         # Add a legend
@@ -368,28 +370,36 @@ def main():
         print("==============================================")
 
         # Get location
-        location = "Cagayan de Oro, PH"
+        location = "Istanbul, TR"
 
         # Get network type
         network_type = "drive"
 
         # Get output filenames
-        output_html = f"{get_input("Enter output HTML filename", "road_network")}.html"
-        output_data = f"{get_input("Enter output data filename", "network_data")}.txt"
+        output_html = f"{get_input('Enter output HTML filename', 'road_network')}.html"
+        output_data = f"{get_input('Enter output data filename', 'network_data')}.txt"
 
         # Download the street network
-        print(f"\nDownloading street network for {location}...")
+        print(f"\nDownloading street network for {location} (highways only)...")
         try:
-            G = ox.graph_from_place(location, network_type=network_type)
+            G = ox.graph_from_place(location, network_type=network_type, simplify=True)
         except Exception as e:
             print(f"Error downloading network: {e}")
             print("Trying with a simpler approach...")
             try:
-                G = ox.graph_from_address(location, network_type=network_type)
+                G = ox.graph_from_address(
+                    location,
+                    network_type=network_type,
+                    simplify=True,
+                )
             except Exception as e2:
                 print(f"Error with second attempt: {e2}")
                 print("Using a default location (Manhattan, NY)...")
-                G = ox.graph_from_place("Manhattan, NY", network_type=network_type)
+                G = ox.graph_from_place(
+                    "Manhattan, NY",
+                    network_type=network_type,
+                    simplify=True,
+                )
 
         # Convert to undirected graph for simplicity
         G_undirected = G.to_undirected()
@@ -414,18 +424,10 @@ def main():
         # Limit graph size if needed
         G_limited = limit_graph_size(G_connected, max_vertices, max_edges)
 
-        # Ask if user wants to renumber nodes
-        simplify_nodes = get_yes_no_input(
-            "\nSimplify node IDs (convert to sequential integers)", True
-        )
-
-        if simplify_nodes:
-            G_simplified, node_mapping = renumber_nodes(G_limited)
-            print("Node IDs simplified to sequential integers")
-            # Use the simplified graph for the rest of the process
-            G_final = G_simplified
-        else:
-            G_final = G_limited
+        G_simplified, node_mapping = renumber_nodes(G_limited)
+        print("Node IDs simplified to sequential integers")
+        # Use the simplified graph for the rest of the process
+        G_final = G_simplified
 
         # Get terminal and blocked edge counts
         print("\nSpecify terminals and blocked edges:")
@@ -488,12 +490,6 @@ def main():
                 print(
                     f"Please open {os.path.abspath(solution_html)} manually in your browser."
                 )
-
-        # [existing code for opening the original visualization...]
-
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
 
         # Open the HTML file if possible
         try:
