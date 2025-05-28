@@ -1,0 +1,9 @@
+Running KMB 2-approximation algorithm...
+KMB 2-approximation algorithm complete.
+Running exact brute-force algorithm...
+(Warning: This may take a long time for large graphs)
+Exact brute-force algorithm complete.
+Comparison:
+KMB 2-approximation: 2 blocked edges, blocked weight: 89, unblocked weight: 454 (runtime: 1 ms)
+Exact brute-force: 2 blocked edges, blocked weight: 89, unblocked weight: 454 (runtime: 22072 ms)
+Approximation ratio (blocked weight): 1

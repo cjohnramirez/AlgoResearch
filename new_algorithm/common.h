@@ -95,29 +95,14 @@ struct SteinerTree
 
     void print_results() const
     {
-
         std::cout << "Steiner Tree Results:" << std::endl;
         std::cout << "Edges in Steiner tree:" << std::endl;
-        // Save results to a file
-        std::ofstream outfile("results.txt");
-        if (!outfile.is_open())
-        {
-            // Try to create the file
-            outfile.open("results.txt", std::ios::out | std::ios::trunc);
-            if (!outfile.is_open())
-            {
-                std::cerr << "Error opening or creating output file!" << std::endl;
-                return;
-            }
-        }
+        
         for (const Edge &edge : edges)
         {
             std::cout << edge.u << " " << edge.v << " " << edge.weight
                       << (edge.is_blocked ? " 1" : " 0") << std::endl;
-            outfile << edge.u << " " << edge.v << " " << edge.weight
-                    << (edge.is_blocked ? " 1" : " 0") << std::endl;
         }
-        outfile.close();
         std::cout << "Number of unblocked edges: " << edges.size() << std::endl;
         std::cout << "Total weight of unblocked edges: " << total_weight << std::endl;
         std::cout << "Number of blocked edges: " << blocked_edges.size() << std::endl;
